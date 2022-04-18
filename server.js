@@ -6,14 +6,24 @@ require("dotenv").config();
 const mySecret = process.env["mongo"];
 const bodyParser = require("body-parser");
 
-mongoose.connect(mySecret, { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env.MONGO_KEY, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 const Schema = mongoose.Schema;
 
+const exerciseSchema = new Schema({
+  description: String,
+  duration: Number,
+  date: Date,
+});
+
+const Exercise = mongoose.model("Exercise", exerciseSchema);
+
 const userSchema = new Schema({
   username: String,
-  count: { type: Number, default: 0 },
-  log: [{ description: String, duration: Number, date: Date }],
+  exercise: [exerciseSchema],
 });
 
 const User = mongoose.model("User", userSchema);
@@ -44,29 +54,31 @@ app.get("/api/users", (req, res) => {
 });
 
 app.post("/api/users/:_id/exercises", (req, res) => {
-  User.findOne({ _id: req.params._id }, (err, data) => {
-    if (err) {
-      res.json({ err });
+  User.findOne({ _id: req.params._id }, (err, user) => {
+    if (!user) {
+      res.status(500).json({ err });
     }
-    let formattedDate = Date.now();
+
+    let date = Date.now();
 
     if (req.body.date) {
-      formattedDate = new Date(req.body.date);
+      date = new Date(req.body.date);
     }
 
-    data.log.push({
+    const newExercise = new Exercise({
       description: req.body.description,
       duration: req.body.duration,
-      date: formattedDate.toDateString(),
+      date: date,
     });
-    data.save();
 
-    res.json({
-      _id: data.id,
-      username: data.username,
-      date: formattedDate.toDateString(),
-      duration: req.body.duration,
-      description: req.body.description,
+    user.exercise.push(newExercise);
+
+    res.status(200).json({
+      _id: user._id,
+      username: user.username,
+      date: user.exercise[0].date.toDateString(),
+      duration: user.exercise[0].duration,
+      description: user.exercise[0].description,
     });
   });
 });
