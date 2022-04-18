@@ -94,71 +94,62 @@ app.post("/api/users/:_id/exercises", (req, res) => {
 });
 
 app.get("/api/users/:_id/logs", (req, res) => {
-  let searchCondition = { _id: req.params._id };
+  if (!req.query.from && !req.query.to && !req.query.limit) {
+    User.findById({ _id: req.params._id }, (err, user) => {
+      if (err) {
+        res.status(500).json({ err });
+      }
 
-  if (
-    (req.query.from !== undefined && req.query.from !== "") ||
-    (req.query.to !== undefined && req.query.to !== "")
-  ) {
-    searchCondition.date = {};
-
-    if (req.query.from !== undefined && req.query.from !== "") {
-      searchCondition.date.$gte = new Date(req.query.from);
-    }
-
-    if (req.query.to !== undefined && req.query.to !== "") {
-      searchCondition.date.$lte = new Date(req.query.to);
-    }
-  }
-
-  let limit = 0;
-
-  if (req.query.limit !== "") {
-    limit = parseInt(req.query.limit);
-  }
-
-  User.findById(searchCondition, (err, user) => {
-    if (err) {
-      res.status(500).json({ err });
-    }
-
-    if (!req.query.from && !req.query.to && !req.query.limit) {
       res.status(200).json({
         user: user.username,
         _id: user._id,
         count: user.count,
-        log: [
-          {
-            description: user.log[0].description,
-            duration: user.log[0].duration,
-            date: user.log[0].date.toDateString(),
-          },
-        ],
+        log: user.log.map((i) => {
+          return {
+            description: i.description,
+            duration: i.duration,
+            date: i.date.toDateString(),
+          };
+        }),
       });
-    } else {
-      Exercise.find(searchCondition)
-        .sort({ date: "asc" })
-        .limit(+limit)
-        .exec((exeErr, data) => {
-          if (exeErr) {
-            res.status(500).json({ exeErr });
-          }
+    });
+  } else {
+    let limit = req.query.limit ? req.query.limit : 0;
+    let from = moment(req.query.from, "YYYY-MM-DD").isValid()
+      ? moment(req.query.from, "YYYY-MM-DD")
+      : 0;
+    let to = moment(req.query.to, "YYYY-MM-DD").isValid()
+      ? moment(req.query.to, "YYYY-MM-DD")
+      : moment().add(1000000000000);
 
-          res.status(200).json({
-            user: user.username,
-            _id: user._id,
+    let filter = { _id: req.params._id };
+    if (from || to) {
+      filter.date = { $gte: from, $lte: to };
+    }
+
+    User.findById({ _id: req.params._id }, (err, user) => {
+      if (err) {
+        res.status(500).json({ err });
+      }
+
+      Exercise.find(filter)
+        .limit(+limit)
+        .exec((err, data) => {
+          res.json({
+            _id: req.params._id,
+            username: user.username,
+            count: data.length,
             log: data.map((i) => {
               return {
                 description: i.description,
                 duration: i.duration,
-                date: i.date,
+                date: i.date.toDateString(),
               };
             }),
-            count: data.lenght,
           });
         });
-    }
-  });
+    });
+  }
 });
 
 const listener = app.listen(process.env.PORT || 3000, () => {
