@@ -23,7 +23,8 @@ const Exercise = mongoose.model("Exercise", exerciseSchema);
 
 const userSchema = new Schema({
   username: String,
-  exercise: [exerciseSchema],
+  count: { type: Number, default: 0 },
+  log: [exerciseSchema],
 });
 
 const User = mongoose.model("User", userSchema);
@@ -71,14 +72,43 @@ app.post("/api/users/:_id/exercises", (req, res) => {
       date: date,
     });
 
-    user.exercise.push(newExercise);
+    user.log.push(newExercise);
+
+    User.findOneAndUpdate(
+      { _id: req.params._id },
+      { count: (user.count += 1) },
+      { new: true }
+    );
+
+    user.save();
 
     res.status(200).json({
       _id: user._id,
       username: user.username,
-      date: user.exercise[0].date.toDateString(),
-      duration: user.exercise[0].duration,
-      description: user.exercise[0].description,
+      date: user.log[0].date.toDateString(),
+      duration: user.log[0].duration,
+      description: user.log[0].description,
+    });
+  });
+});
+
+app.get("/api/users/:_id/logs", (req, res) => {
+  User.findById({ _id: req.params._id }, (err, user) => {
+    if (err) {
+      res.status(500).json({ err });
+    }
+
+    res.status(200).json({
+      user: user.username,
+      _id: user._id,
+      count: user.count,
+      log: [
+        {
+          description: user.log[0].description,
+          duration: user.log[0].duration,
+          date: user.log[0].date.toDateString(),
+        },
+      ],
     });
   });
 });
