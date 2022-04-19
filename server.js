@@ -3,9 +3,7 @@ const app = express();
 const cors = require("cors");
 const mongoose = require("mongoose");
 require("dotenv").config();
-const mySecret = process.env["mongo"];
 const bodyParser = require("body-parser");
-const moment = require("moment");
 
 mongoose.connect(process.env.MONGO_KEY, {
   useNewUrlParser: true,
@@ -15,6 +13,7 @@ mongoose.connect(process.env.MONGO_KEY, {
 const Schema = mongoose.Schema;
 
 const exerciseSchema = new Schema({
+  username: String,
   description: String,
   duration: Number,
   date: Date,
@@ -68,10 +67,13 @@ app.post("/api/users/:_id/exercises", (req, res) => {
     }
 
     const newExercise = new Exercise({
+      username: user.username,
       description: req.body.description,
       duration: req.body.duration,
       date: date,
     });
+
+    newExercise.save();
 
     user.log.push(newExercise);
 
@@ -108,46 +110,39 @@ app.get("/api/users/:_id/logs", (req, res) => {
           return {
             description: i.description,
             duration: i.duration,
-            date: i.date.toDateString(),
+            date: new Date(i.date).toDateString(),
           };
         }),
       });
     });
   } else {
     let limit = req.query.limit ? req.query.limit : 0;
-    let from = moment(req.query.from, "YYYY-MM-DD").isValid()
-      ? moment(req.query.from, "YYYY-MM-DD")
-      : 0;
-    let to = moment(req.query.to, "YYYY-MM-DD").isValid()
-      ? moment(req.query.to, "YYYY-MM-DD")
-      : moment().add(1000000000000);
-
-    let filter = { _id: req.params._id };
-    if (from || to) {
-      filter.date = { $gte: from, $lte: to };
-    }
 
     User.findById({ _id: req.params._id }, (err, user) => {
       if (err) {
         res.status(500).json({ err });
       }
 
-      Exercise.find(filter)
-        .limit(+limit)
-        .exec((err, data) => {
-          res.json({
-            _id: req.params._id,
-            username: user.username,
-            count: data.length,
-            log: data.map((i) => {
-              return {
-                description: i.description,
-                duration: i.duration,
-                date: i.date.toDateString(),
-              };
-            }),
-          });
+      Exercise.find({ username: user.username }).exec((err, data) => {
+        if (req.query.from && req.query.to) {
+          data = data.filter(
+            (d) =>
+              Date.parse(d.date) >= Date.parse(req.query.from) &&
+              Date.parse(d.date) <= Date.parse(req.query.to)
+          );
+        }
+
+        if (req.query.limit) {
+          data = data.filter((d, i) => i < req.query.limit);
+        }
+
+        res.json({
+          _id: user._id,
+          userName: data.userName,
+          conunt: data.length,
+          log: data,
         });
+      });
     });
   }
 });
