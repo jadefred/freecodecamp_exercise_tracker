@@ -88,8 +88,6 @@ router.get("/:_id/logs", (req, res) => {
       });
     });
   } else {
-    let limit = req.query.limit ? req.query.limit : 0;
-
     User.findById({ _id: req.params._id }, (err, user) => {
       if (err) {
         res.status(500).json({ err });

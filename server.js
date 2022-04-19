@@ -10,9 +10,6 @@ mongoose.connect(process.env.MONGO_KEY, {
   useUnifiedTopology: true,
 });
 
-//const { Exercise } = require("./models/user");
-//const { User } = require("./models/user");
-
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 app.use(express.static("public"));
